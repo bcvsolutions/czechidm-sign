@@ -132,8 +132,11 @@ public class DefaultSignSignatureService implements SignSignatureService {
 			// Validate
 			JwsCompactConsumer jwsConsumer = new JwsCompactConsumer(jwsContent);
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_SIGN);
-			jwsConsumer.verifySignatureWith(webKey);
-			return IOUtils.toInputStream(jwsConsumer.getDecodedJwsPayload(), StandardCharsets.UTF_8);
+			boolean isValid = jwsConsumer.verifySignatureWith(webKey);
+			if (isValid) {
+				return IOUtils.toInputStream(jwsConsumer.getDecodedJwsPayload(), StandardCharsets.UTF_8);
+			}
+			throw new CoreException("Signature is not valid");
 		} catch (IOException e) {
 			throw new CoreException(e);
 		}
