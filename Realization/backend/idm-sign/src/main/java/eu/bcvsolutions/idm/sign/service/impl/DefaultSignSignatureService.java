@@ -11,6 +11,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -21,11 +22,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.cxf.rs.security.jose.jwa.ContentAlgorithm;
 import org.apache.cxf.rs.security.jose.jwa.KeyAlgorithm;
 import org.apache.cxf.rs.security.jose.jwa.SignatureAlgorithm;
-import org.apache.cxf.rs.security.jose.jwe.ContentDecryptionProvider;
-import org.apache.cxf.rs.security.jose.jwe.ContentEncryptionProvider;
-import org.apache.cxf.rs.security.jose.jwe.JweDecryption;
+import org.apache.cxf.rs.security.jose.jwe.AesCbcHmacJweDecryption;
+import org.apache.cxf.rs.security.jose.jwe.AesCbcHmacJweEncryption;
 import org.apache.cxf.rs.security.jose.jwe.JweDecryptionProvider;
-import org.apache.cxf.rs.security.jose.jwe.JweEncryption;
 import org.apache.cxf.rs.security.jose.jwe.JweEncryptionProvider;
 import org.apache.cxf.rs.security.jose.jwe.JweException;
 import org.apache.cxf.rs.security.jose.jwe.JweHeaders;
@@ -38,6 +37,7 @@ import org.apache.cxf.rs.security.jose.jws.JwsCompactConsumer;
 import org.apache.cxf.rs.security.jose.jws.JwsCompactProducer;
 import org.apache.cxf.rs.security.jose.jws.JwsHeaders;
 import org.apache.cxf.rt.security.crypto.CryptoUtils;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +59,12 @@ public class DefaultSignSignatureService implements SignSignatureService {
 
 	@Autowired
 	private SignConfiguration signConfiguration;
+
+	public DefaultSignSignatureService() {
+		if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+			Security.addProvider(new BouncyCastleProvider());
+		}
+	}
 
 	@Override
 	public OutputStream signDocumentAndEncrypt(OutputStream document, String keyAlias, GuardedString privatePass) {
@@ -157,10 +163,9 @@ public class DefaultSignSignatureService implements SignSignatureService {
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_ENCRYPT);
 
 			KeyEncryptionProvider keyEncryptionAlgo = JweUtils.getKeyEncryptionProvider(webKey);
-			ContentEncryptionProvider contentEncryptionAlgo = JweUtils.getContentEncryptionProvider(ContentAlgorithm.A256GCM);
-			JweEncryptionProvider encryptor = new JweEncryption(keyEncryptionAlgo, contentEncryptionAlgo);
+			JweEncryptionProvider encryptor = new AesCbcHmacJweEncryption(ContentAlgorithm.A128CBC_HS256, keyEncryptionAlgo);
 
-			JweHeaders headers = new JweHeaders(KeyAlgorithm.RSA_OAEP, ContentAlgorithm.A256GCM);
+			JweHeaders headers = new JweHeaders(KeyAlgorithm.RSA_OAEP, ContentAlgorithm.A128CBC_HS256);
 
 			String jweOut = encryptor.encrypt(content.getBytes(StandardCharsets.UTF_8), headers);
 
@@ -193,8 +198,8 @@ public class DefaultSignSignatureService implements SignSignatureService {
 			webKeyPrivate.setKeyProperty("e", webKeyPublic.getKeyProperty("e"));
 
 			KeyDecryptionProvider keyDecryptionAlgo = JweUtils.getKeyDecryptionProvider(webKeyPrivate);
-			ContentDecryptionProvider contentDecryptionAlgo = JweUtils.getContentDecryptionProvider(ContentAlgorithm.A256GCM);
-			JweDecryptionProvider decryptor = new JweDecryption(keyDecryptionAlgo, contentDecryptionAlgo);
+			JweDecryptionProvider decryptor = new AesCbcHmacJweDecryption(keyDecryptionAlgo, ContentAlgorithm.A128CBC_HS256);
+
 			String decryptedText = decryptor.decrypt(jweContent).getContentText();
 
 			return IOUtils.toInputStream(decryptedText, StandardCharsets.UTF_8);
