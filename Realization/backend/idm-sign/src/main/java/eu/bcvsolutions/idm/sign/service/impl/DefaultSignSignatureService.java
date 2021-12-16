@@ -13,7 +13,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
 import java.security.UnrecoverableEntryException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -67,12 +66,13 @@ public class DefaultSignSignatureService implements SignSignatureService {
 	}
 
 	@Override
-	public OutputStream signDocumentAndEncrypt(OutputStream document, String keyAlias, GuardedString privatePass) {
+	public OutputStream signDocumentAndEncrypt(OutputStream document, String keyAliasSign, GuardedString privatePassSign, String keyAliasEncrypt) {
 		Assert.notNull(document, "Document can't be null");
-		Assert.notNull(keyAlias, "keyAlias can't be null");
-		Assert.notNull(privatePass, "privatePass can't be null");
+		Assert.notNull(keyAliasSign, "keyAliasSign can't be null");
+		Assert.notNull(privatePassSign, "privatePassSign can't be null");
+		Assert.notNull(keyAliasEncrypt, "keyAliasEncrypt can't be null");
 
-		return encryptDocument(signDocument(document, keyAlias, privatePass), keyAlias);
+		return encryptDocument(signDocument(document, keyAliasSign, privatePassSign), keyAliasEncrypt);
 	}
 
 	@Override
@@ -126,15 +126,16 @@ public class DefaultSignSignatureService implements SignSignatureService {
 	}
 
 	@Override
-	public InputStream validateDocumentAndDecrypt(InputStream document, String keyAlias, GuardedString privatePass) {
+	public InputStream validateDocumentAndDecrypt(InputStream document, String keyAliasSign, String keyAliasDecrypt, GuardedString privatePassDecrypt) {
 		Assert.notNull(document, "Document can't be null");
-		Assert.notNull(keyAlias, "keyAlias can't be null");
-		Assert.notNull(privatePass, "privatePass can't be null");
+		Assert.notNull(keyAliasSign, "keyAliasSign can't be null");
+		Assert.notNull(keyAliasDecrypt, "keyAliasDecrypt can't be null");
+		Assert.notNull(privatePassDecrypt, "privatePassDecrypt can't be null");
 
 		try {
-			InputStream decryptedStream = decryptDocument(document, keyAlias, privatePass);
+			InputStream decryptedStream = decryptDocument(document, keyAliasDecrypt, privatePassDecrypt);
 			String jwsContent = IOUtils.toString(decryptedStream, StandardCharsets.UTF_8.name());
-			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAlias);
+			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAliasSign);
 			// Validate
 			JwsCompactConsumer jwsConsumer = new JwsCompactConsumer(jwsContent);
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_SIGN);
@@ -156,10 +157,7 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		ByteArrayOutputStream outputStream = (ByteArrayOutputStream) document;
 		String content = outputStream.toString();
 		try {
-
-			KeyStore keyStore = loadKeystore();
-			Certificate certificate = keyStore.getCertificate(keyAlias);
-			PublicKey publicRsaKey = certificate.getPublicKey();
+			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAlias);
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_ENCRYPT);
 
 			KeyEncryptionProvider keyEncryptionAlgo = JweUtils.getKeyEncryptionProvider(webKey);
@@ -172,7 +170,7 @@ public class DefaultSignSignatureService implements SignSignatureService {
 			OutputStream out = new ByteArrayOutputStream();
 			out.write(jweOut.getBytes(StandardCharsets.UTF_8));
 			return out;
-		} catch (IOException | JweException | KeyStoreException e) {
+		} catch (IOException | JweException e) {
 			throw new CoreException(e);
 		}
 	}

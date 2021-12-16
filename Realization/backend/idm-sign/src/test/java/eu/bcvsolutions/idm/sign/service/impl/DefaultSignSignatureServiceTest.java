@@ -15,9 +15,6 @@ import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -64,8 +61,10 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	private KeyStore ks;
 	private String privatePass = "pass12";
 	private String privatePass1 = "pass1234";
+	private String privatePass2 = "pass123456";
 	private String aliasPrivate = "private key";
 	private String aliasPrivate1 = "private key1";
+	private String aliasPrivate2 = "private key2";
 
 	@Autowired
 	private SignSignatureService signSignatureService;
@@ -88,12 +87,15 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 			keyGenerator.initialize(3072);
 			KeyPair keyPair = keyGenerator.generateKeyPair();
 			KeyPair keyPair1 = keyGenerator.generateKeyPair();
+			KeyPair keyPair2 = keyGenerator.generateKeyPair();
 
 			Certificate[] chain = {generate(keyPair, "SHA256withRSA", "one", 365)};
 			Certificate[] chain1 = {generate(keyPair1, "SHA256withRSA", "two", 365)};
+			Certificate[] chain2 = {generate(keyPair2, "SHA256withRSA", "three", 365)};
 
 			ks.setKeyEntry(aliasPrivate, keyPair.getPrivate(), privatePass.toCharArray(), chain);
 			ks.setKeyEntry(aliasPrivate1, keyPair1.getPrivate(), privatePass1.toCharArray(), chain1);
+			ks.setKeyEntry(aliasPrivate2, keyPair2.getPrivate(), privatePass2.toCharArray(), chain2);
 
 			//Storing the KeyStore object
 			try (FileOutputStream fos = new FileOutputStream(testKeystoreLocation)) {
@@ -105,7 +107,7 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	public void testEncryptionDecryption() throws IOException, NoSuchAlgorithmException, NoSuchProviderException, CertificateException, KeyStoreException {
+	public void testEncryptionDecryption() throws IOException {
 		String message = "Super secret message";
 
 		// prepare output stream with message
@@ -128,7 +130,7 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	}
 
 	@Test(expected = SecurityException.class)
-	public void testEncryptionDecryptionWrongKey() throws IOException, NoSuchAlgorithmException, NoSuchProviderException {
+	public void testEncryptionDecryptionWrongKey() throws IOException {
 		String message = "Super secret message";
 
 		// prepare output stream with message
@@ -146,7 +148,7 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	public void testSignDocumentAndValidate() throws NoSuchAlgorithmException, IOException {
+	public void testSignDocumentAndValidate() throws IOException {
 		String message = "Super secret message";
 		// prepare output stream with message
 		ByteArrayOutputStream stream = new ByteArrayOutputStream();
@@ -163,7 +165,7 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	public void testSignDocumentAndValidateWithWrongKey() throws NoSuchAlgorithmException, IOException {
+	public void testSignDocumentAndValidateWithWrongKey() throws IOException {
 		String message = "Super secret message";
 		// prepare output stream with message
 		ByteArrayOutputStream stream = new ByteArrayOutputStream();
@@ -180,18 +182,18 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	public void testSignAndEncryptAndDecrypt() throws IOException, NoSuchAlgorithmException {
+	public void testSignAndEncryptAndDecrypt() throws IOException {
 		String message = "Super secret message";
 		// prepare output stream with message
 		ByteArrayOutputStream stream = new ByteArrayOutputStream();
 		stream.write(message.getBytes(StandardCharsets.UTF_8));
 
-		ByteArrayOutputStream signedAndEncrypted = (ByteArrayOutputStream) signSignatureService.signDocumentAndEncrypt(stream, aliasPrivate, new GuardedString(privatePass));
+		ByteArrayOutputStream signedAndEncrypted = (ByteArrayOutputStream) signSignatureService.signDocumentAndEncrypt(stream, aliasPrivate, new GuardedString(privatePass), aliasPrivate2);
 
 		// Signed output stream to input stream
 		InputStream inputStream = new ByteArrayInputStream(signedAndEncrypted.toByteArray());
 
-		InputStream validatedAndDecrypted = signSignatureService.validateDocumentAndDecrypt(inputStream, aliasPrivate, new GuardedString(privatePass));
+		InputStream validatedAndDecrypted = signSignatureService.validateDocumentAndDecrypt(inputStream, aliasPrivate, aliasPrivate2, new GuardedString(privatePass2));
 
 		// Input stream to string
 		String text = IOUtils.toString(validatedAndDecrypted, StandardCharsets.UTF_8.name());
