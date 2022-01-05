@@ -9,7 +9,7 @@ Signing and crypting
 * This signed and coded string is then encrypted(JWE)
 * JWE using RSA-OAEP for key and A128CBC_HS256 for content. Crypting is done via public part of RSA key
 
-Velidating and decryptinh
+Velidating and decrypting
 * Private part of RSA key is used for decrypt
 * Public part of RSA key is used for validating signature
 * If signing is OK, plain text is returned
@@ -17,7 +17,7 @@ Velidating and decryptinh
 You can use diffrent key pair for signing and for encrypting. In fact this is recommended.
 For inspiration how to call methods from service, you can look into [test class](https://github.com/bcvsolutions/czechidm-sign/blob/develop/Realization/backend/idm-sign/src/test/java/eu/bcvsolutions/idm/sign/service/impl/DefaultSignSignatureServiceTest.java).
 ### IdM configuration properties
-idm.sec.signkeystoreLocation=path/to/keystore.jks
+idm.sec.signkeystoreLocation=path/to/keystore.jks  
 idm.sec.signkeystorePassword=password to keystore
 
 ### Preparing keystore
