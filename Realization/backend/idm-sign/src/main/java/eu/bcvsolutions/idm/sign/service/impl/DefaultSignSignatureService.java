@@ -53,14 +53,15 @@ public class DefaultSignSignatureService implements SignSignatureService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(DefaultSignSignatureService.class);
 
-	private final String KEY_ALGO_ENCRYPT = "RSA-OAEP";
-	private final String KEY_ALGO_SIGN = "RS256";
+	private static final String KEY_ALGO_ENCRYPT = "RSA-OAEP";
+	private static final String KEY_ALGO_SIGN = "RS256";
 
 	@Autowired
 	private SignConfiguration signConfiguration;
 
 	public DefaultSignSignatureService() {
 		if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+			LOG.info("BouncyCastle provider is not found, adding it now.");
 			Security.addProvider(new BouncyCastleProvider());
 		}
 	}
@@ -81,27 +82,38 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		Assert.notNull(keyAlias, "keyAlias can't be null");
 		Assert.notNull(privatePass, "privatePass can't be null");
 
-		ByteArrayOutputStream outputStream = (ByteArrayOutputStream) document;
-		String content = outputStream.toString();
+		LOG.info("Signing for document start");
 
-		JwsHeaders headers = new JwsHeaders(SignatureAlgorithm.RS256);
-		JwsCompactProducer jwsProducer = new JwsCompactProducer(headers, content);
+		ByteArrayOutputStream outputStream = (ByteArrayOutputStream) document;
 		try {
+			String content = outputStream.toString(StandardCharsets.UTF_8.name());
+
+			JwsHeaders headers = new JwsHeaders(SignatureAlgorithm.RS256);
+			JwsCompactProducer jwsProducer = new JwsCompactProducer(headers, content);
+
 			KeyStore keyStore = loadKeystore();
+
+			LOG.info("Getting entry from keystore");
 			KeyStore.PrivateKeyEntry pkEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyAlias, new KeyStore.PasswordProtection(privatePass.asString().toCharArray()));
 			PublicKey publicRsaKey = pkEntry.getCertificate().getPublicKey();
 			PrivateKey privateRsaKey = pkEntry.getPrivateKey();
 
+			LOG.info("Keys from keystore loaded");
+
 			JsonWebKey webKeyPrivate = JwkUtils.fromRSAPrivateKey((RSAPrivateKey) privateRsaKey, KEY_ALGO_SIGN);
 			JsonWebKey webKeyPublic = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_ENCRYPT);
+
+			LOG.info("Webkeys prepared");
 
 			// put public info into private key, otherwise getKeyDecryptionProvider will fail on nullpointer, because this property can't be null
 			webKeyPrivate.setKeyProperty("e", webKeyPublic.getKeyProperty("e"));
 
 			// Sign
+			LOG.info("Signing document");
 			String jwsSequence = jwsProducer.signWith(webKeyPrivate);
 			OutputStream out = new ByteArrayOutputStream();
 			out.write(jwsSequence.getBytes(StandardCharsets.UTF_8));
+			LOG.info("Signing for document end");
 			return out;
 		} catch (IOException | NoSuchAlgorithmException | UnrecoverableEntryException | KeyStoreException e) {
 			throw new CoreException(e);
@@ -114,11 +126,14 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		Assert.notNull(keyAlias, "keyAlias can't be null");
 
 		try {
+			LOG.info("Validating document");
 			String jweContent = IOUtils.toString(document, StandardCharsets.UTF_8.name());
 			JwsCompactConsumer jwsConsumer = new JwsCompactConsumer(jweContent);
+			LOG.info("Loading key from keystore");
 			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAlias);
 
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_SIGN);
+			LOG.info("Keys prepared, verify signature next");
 			return jwsConsumer.verifySignatureWith(webKey);
 		} catch (IOException e) {
 			throw new CoreException(e);
@@ -135,14 +150,18 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		try {
 			InputStream decryptedStream = decryptDocument(document, keyAliasDecrypt, privatePassDecrypt);
 			String jwsContent = IOUtils.toString(decryptedStream, StandardCharsets.UTF_8.name());
+			LOG.info("Loading keys from keystore");
 			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAliasSign);
 			// Validate
+			LOG.info("Validating content");
 			JwsCompactConsumer jwsConsumer = new JwsCompactConsumer(jwsContent);
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_SIGN);
 			boolean isValid = jwsConsumer.verifySignatureWith(webKey);
 			if (isValid) {
+				LOG.info("content is valid, decrypt it now");
 				return IOUtils.toInputStream(jwsConsumer.getDecodedJwsPayload(), StandardCharsets.UTF_8);
 			}
+			LOG.info("Content is not valid");
 			throw new CoreException("Signature is not valid");
 		} catch (IOException e) {
 			throw new CoreException(e);
@@ -154,21 +173,27 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		Assert.notNull(document, "Document can't be null");
 		Assert.notNull(keyAlias, "publicKeyAlias can't be null");
 
+		LOG.info("Encrypt start");
+
 		ByteArrayOutputStream outputStream = (ByteArrayOutputStream) document;
-		String content = outputStream.toString();
 		try {
+			String content = outputStream.toString(StandardCharsets.UTF_8.name());
+			LOG.info("Loading keys from keystore");
 			PublicKey publicRsaKey = CryptoUtils.loadPublicKey(loadKeystore(), keyAlias);
 			JsonWebKey webKey = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_ENCRYPT);
 
+			LOG.info("Preparing encryptors");
 			KeyEncryptionProvider keyEncryptionAlgo = JweUtils.getKeyEncryptionProvider(webKey);
 			JweEncryptionProvider encryptor = new AesCbcHmacJweEncryption(ContentAlgorithm.A128CBC_HS256, keyEncryptionAlgo);
 
 			JweHeaders headers = new JweHeaders(KeyAlgorithm.RSA_OAEP, ContentAlgorithm.A128CBC_HS256);
 
+			LOG.info("Encrypting now");
 			String jweOut = encryptor.encrypt(content.getBytes(StandardCharsets.UTF_8), headers);
 
 			OutputStream out = new ByteArrayOutputStream();
 			out.write(jweOut.getBytes(StandardCharsets.UTF_8));
+			LOG.info("Encrypt end");
 			return out;
 		} catch (IOException | JweException e) {
 			throw new CoreException(e);
@@ -181,25 +206,34 @@ public class DefaultSignSignatureService implements SignSignatureService {
 		Assert.notNull(keyAlias, "keyAlias can't be null");
 		Assert.notNull(privatePass, "privatePass can't be null");
 
+		LOG.info("Decrypt start");
+
 		try {
 			String jweContent = IOUtils.toString(document, StandardCharsets.UTF_8.name());
-
 			KeyStore keyStore = loadKeystore();
+
+			LOG.info("Getting entry from keystore");
 			KeyStore.PrivateKeyEntry pkEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyAlias, new KeyStore.PasswordProtection(privatePass.asString().toCharArray()));
 			PublicKey publicRsaKey = pkEntry.getCertificate().getPublicKey();
 			PrivateKey privateRsaKey = pkEntry.getPrivateKey();
 
+			LOG.info("Keys from keystore loaded");
+
 			JsonWebKey webKeyPublic = JwkUtils.fromRSAPublicKey((RSAPublicKey) publicRsaKey, KEY_ALGO_ENCRYPT);
 			JsonWebKey webKeyPrivate = JwkUtils.fromRSAPrivateKey((RSAPrivateKey) privateRsaKey, KEY_ALGO_ENCRYPT);
+
+			LOG.info("Webkeys prepared");
 
 			// put public info into private key, otherwise getKeyDecryptionProvider will fail on nullpointer, because this property can't be null
 			webKeyPrivate.setKeyProperty("e", webKeyPublic.getKeyProperty("e"));
 
+			LOG.info("Preparing decryptor");
 			KeyDecryptionProvider keyDecryptionAlgo = JweUtils.getKeyDecryptionProvider(webKeyPrivate);
 			JweDecryptionProvider decryptor = new AesCbcHmacJweDecryption(keyDecryptionAlgo, ContentAlgorithm.A128CBC_HS256);
 
 			String decryptedText = decryptor.decrypt(jweContent).getContentText();
 
+			LOG.info("Decrypt end");
 			return IOUtils.toInputStream(decryptedText, StandardCharsets.UTF_8);
 		} catch (IOException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableEntryException e) {
 			throw new CoreException(e);
@@ -207,15 +241,16 @@ public class DefaultSignSignatureService implements SignSignatureService {
 	}
 
 	private KeyStore loadKeystore() {
+		LOG.info("Loading keystore start");
 		String keystoreLocation = signConfiguration.getKeystoreLocation();
 		GuardedString keyStorePassword = signConfiguration.getKeyStorePassword();
 
 		Assert.hasLength(keystoreLocation, "Keystore location must be set");
 		Assert.notNull(keyStorePassword, "Keystore password must be set");
-
-		try {
+		try (FileInputStream fileInputStream = new FileInputStream(keystoreLocation)) {
 			KeyStore ks = KeyStore.getInstance("JKS");
-			ks.load(new FileInputStream(keystoreLocation), keyStorePassword.asString().toCharArray());
+			ks.load(fileInputStream, keyStorePassword.asString().toCharArray());
+			LOG.info("Loading keystore end");
 			return ks;
 		} catch (KeyStoreException | CertificateException | IOException | NoSuchAlgorithmException e) {
 			throw new CoreException(e);

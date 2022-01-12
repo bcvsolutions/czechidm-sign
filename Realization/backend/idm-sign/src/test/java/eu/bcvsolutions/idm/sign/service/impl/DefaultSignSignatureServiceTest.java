@@ -89,9 +89,9 @@ public class DefaultSignSignatureServiceTest extends AbstractIntegrationTest {
 			KeyPair keyPair1 = keyGenerator.generateKeyPair();
 			KeyPair keyPair2 = keyGenerator.generateKeyPair();
 
-			Certificate[] chain = {generate(keyPair, "SHA256withRSA", "one", 365)};
-			Certificate[] chain1 = {generate(keyPair1, "SHA256withRSA", "two", 365)};
-			Certificate[] chain2 = {generate(keyPair2, "SHA256withRSA", "three", 365)};
+			Certificate[] chain = {generate(keyPair, "SHA256withRSA", "one", 1825)};
+			Certificate[] chain1 = {generate(keyPair1, "SHA256withRSA", "two", 1825)};
+			Certificate[] chain2 = {generate(keyPair2, "SHA256withRSA", "three", 1825)};
 
 			ks.setKeyEntry(aliasPrivate, keyPair.getPrivate(), privatePass.toCharArray(), chain);
 			ks.setKeyEntry(aliasPrivate1, keyPair1.getPrivate(), privatePass1.toCharArray(), chain1);
