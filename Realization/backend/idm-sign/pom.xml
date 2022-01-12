@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>eu.bcvsolutions.idm</groupId>
+		<artifactId>idm-parent</artifactId>
+		<version>10.8.0</version>
+	</parent>
+
+	<artifactId>idm-sign</artifactId>
+
+		<packaging>jar</packaging>
+
+	<name>CzechIdM Module Sign</name>
+
+	<version>1.0.0</version>
+	<description>CzechIdM Module Sign.</description>
+
+	<properties>
+		<czechidm-version>10.8.0</czechidm-version>
+	</properties>
+
+	<organization>
+		<name>BCV solutions s.r.o.</name>
+		<url>http://www.bcvsolutions.eu</url>
+	</organization>
+
+	<developers>
+		<developer>
+			<id>RK</id>
+			<name>Roman Kučera</name>
+			<roles>
+				<role>Developer</role>
+			</roles>
+		</developer>
+	</developers>
+
+
+	<repositories>
+    	<repository>
+            <id>nexus-public-releases</id>
+            <url>https://nexus.bcvsolutions.eu/repository/maven-public-releases/</url>
+        </repository>
+        <repository>
+            <id>nexus-releases</id>
+            <url>https://nexus.bcvsolutions.eu/repository/maven-releases/</url>
+        </repository>
+    </repositories>
+
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-resources-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-fe-sources</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>target/idm/fe-sources/czechidm-modules</outputDirectory>
+							<resources>
+								<resource>
+									<directory>../../frontend</directory>
+									<filtering>false</filtering>
+									<excludes>
+										<exclude>**/.*</exclude>
+									</excludes>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+						</manifest>
+						<manifestEntries>
+							<Implementation-Build>${buildNumber}</Implementation-Build>
+							<Specification-Title>${project.description}</Specification-Title>
+						</manifestEntries>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
+
+		<resources>
+			<resource>
+				<filtering>false</filtering>
+				<directory>src/main/resources</directory>
+				<excludes>
+					<exclude>application.properties</exclude>
+					<exclude>module-*.properties</exclude>
+				</excludes>
+			</resource>
+			<resource>
+				<filtering>true</filtering>
+				<directory>src/main/resources</directory>
+				<includes>
+					<include>application.properties</include>
+					<include>module-*.properties</include>
+				</includes>
+			</resource>
+			<resource>
+				<filtering>false</filtering>
+				<directory>target/idm</directory>
+			</resource>
+		</resources>
+
+	</build>
+
+	<dependencies>
+		<dependency>
+			<groupId>eu.bcvsolutions.idm</groupId>
+			<artifactId>idm-core-impl</artifactId>
+			<version>${czechidm-version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>eu.bcvsolutions.idm</groupId>
+			<artifactId>idm-core-test-api</artifactId>
+			<version>${czechidm-version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-rt-rs-security-jose</artifactId>
+			<version>3.1.7</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-rt-rs-security-jose-jaxrs</artifactId>
+			<version>3.1.7</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk15on</artifactId>
+			<version>1.70</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk15on -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcpkix-jdk15on</artifactId>
+			<version>1.70</version>
+		</dependency>
+
+	</dependencies>
+
+	<profiles>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<!-- First, use the swagger2markup plugin to generate asciidoc -->
+					<plugin>
+						<groupId>io.github.swagger2markup</groupId>
+						<artifactId>swagger2markup-maven-plugin</artifactId>
+						<version>${swagger2markup.version}</version>
+
+						<configuration>
+							<swaggerInput>${swagger.input}</swaggerInput>
+							<outputDir>${generated.asciidoc.directory}</outputDir>
+							<config>
+								<swagger2markup.markupLanguage>ASCIIDOC</swagger2markup.markupLanguage>
+								<swagger2markup.outputLanguage>EN</swagger2markup.outputLanguage>
+								<swagger2markup.pathsGroupedBy>TAGS</swagger2markup.pathsGroupedBy>
+								<swagger2markup.generatedExamplesEnabled>false</swagger2markup.generatedExamplesEnabled>
+
+								<swagger2markup.extensions.dynamicOverview.contentPath>${asciidoctor.input.extensions.directory}/overview</swagger2markup.extensions.dynamicOverview.contentPath>
+								<swagger2markup.extensions.dynamicDefinitions.contentPath>${asciidoctor.input.extensions.directory}/definitions</swagger2markup.extensions.dynamicDefinitions.contentPath>
+								<swagger2markup.extensions.dynamicPaths.contentPath>${asciidoctor.input.extensions.directory}/paths</swagger2markup.extensions.dynamicPaths.contentPath>
+								<swagger2markup.extensions.dynamicSecurity.contentPath>${asciidoctor.input.extensions.directory}/security/</swagger2markup.extensions.dynamicSecurity.contentPath>
+
+								<swagger2markup.extensions.springRestDocs.snippetBaseUri>${swagger.snippetOutput.dir}</swagger2markup.extensions.springRestDocs.snippetBaseUri>
+								<swagger2markup.extensions.springRestDocs.defaultSnippets>true</swagger2markup.extensions.springRestDocs.defaultSnippets>
+							</config>
+						</configuration>
+						<executions>
+							<execution>
+								<phase>test</phase>
+								<goals>
+									<goal>convertSwagger2markup</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!--
+						Run the generated asciidoc through Asciidoctor to generate other
+						documentation types, such as PDFs or HTML5
+					-->
+					<plugin>
+						<groupId>org.asciidoctor</groupId>
+						<artifactId>asciidoctor-maven-plugin</artifactId>
+						<version>2.2.1</version>
+						<!-- Configure generic document generation settings -->
+						<configuration>
+							<sourceDirectory>${asciidoctor.input.directory}</sourceDirectory>
+							<sourceDocumentName>index.adoc</sourceDocumentName>
+							<attributes>
+								<doctype>book</doctype>
+								<toc>left</toc>
+								<toclevels>2</toclevels> <!-- Resources by tag names in menu only -->
+								<numbered />
+								<hardbreaks />
+								<sectlinks />
+								<sectanchors />
+								<generated>${generated.asciidoc.directory}</generated>
+							</attributes>
+						</configuration>
+						<!--
+							Since each execution can only handle one backend, run separate
+							executions for each desired output type
+						-->
+						<executions>
+							<execution>
+								<id>output-html</id>
+								<phase>test</phase>
+								<goals>
+									<goal>process-asciidoc</goal>
+								</goals>
+								<configuration>
+									<backend>html5</backend>
+									<outputDirectory>${asciidoctor.html.output.directory.prefix}/sign/${project.version}/doc</outputDirectory>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+</project>
